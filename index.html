@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <title>PortalCDS | Validación SPP/RFCOMM</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b1020;
+        --panel: #111a33;
+        --panel-2: #16213f;
+        --text: #eef2ff;
+        --muted: #a8b3cf;
+        --accent: #7c9cff;
+        --good: #4ade80;
+        --warn: #fbbf24;
+        --bad: #f87171;
+        --line: rgba(255, 255, 255, 0.1);
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at top, rgba(124, 156, 255, 0.22), transparent 34%),
+          linear-gradient(180deg, #0b1020 0%, #090d18 100%);
+        color: var(--text);
+      }
+
+      .wrap {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+
+      header {
+        display: grid;
+        gap: 12px;
+        margin-bottom: 20px;
+      }
+
+      h1 { margin: 0; font-size: clamp(1.8rem, 3vw, 3rem); }
+      p { margin: 0; color: var(--muted); line-height: 1.5; }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1.2fr 0.8fr;
+        gap: 16px;
+      }
+
+      .card {
+        background: rgba(17, 26, 51, 0.92);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 18px;
+        box-shadow: 0 18px 60px rgba(0, 0, 0, 0.28);
+      }
+
+      .stack { display: grid; gap: 12px; }
+      .row { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .row-3 { display: grid; gap: 10px; grid-template-columns: 1.2fr 0.8fr 0.8fr; }
+
+      label {
+        display: grid;
+        gap: 6px;
+        font-size: 0.92rem;
+        color: var(--muted);
+      }
+
+      input, textarea, button, select {
+        font: inherit;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        background: #0d1430;
+        color: var(--text);
+      }
+
+      input, textarea, select { width: 100%; padding: 12px; }
+      textarea { min-height: 120px; resize: vertical; }
+
+      button {
+        padding: 12px 14px;
+        cursor: pointer;
+        background: linear-gradient(180deg, rgba(124, 156, 255, 0.95), rgba(92, 124, 255, 0.92));
+        border: 0;
+        font-weight: 700;
+      }
+
+      button.secondary { background: #172247; border: 1px solid var(--line); }
+      button.danger { background: #3d1620; border: 1px solid rgba(248, 113, 113, 0.3); }
+      button:disabled { opacity: 0.55; cursor: not-allowed; }
+
+      .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+      .chip {
+        padding: 8px 10px;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.06);
+        border: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 0.88rem;
+      }
+
+      .status {
+        display: grid;
+        gap: 10px;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        width: fit-content;
+        background: rgba(255,255,255,0.06);
+        border: 1px solid var(--line);
+      }
+
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--warn);
+        box-shadow: 0 0 16px currentColor;
+      }
+
+      .dot.good { background: var(--good); }
+      .dot.bad { background: var(--bad); }
+
+      .kvs {
+        display: grid;
+        gap: 8px;
+        font-size: 0.92rem;
+      }
+
+      .kvs div {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 8px;
+      }
+
+      .kvs span:last-child { color: var(--text); text-align: right; }
+
+      pre {
+        margin: 0;
+        padding: 14px;
+        min-height: 240px;
+        max-height: 55vh;
+        overflow: auto;
+        background: #070b16;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        color: #d8e2ff;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .foot {
+        margin-top: 18px;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      @media (max-width: 900px) {
+        .grid, .row, .row-3 { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <header>
+        <div class="chips">
+          <span class="chip">Validación técnica</span>
+          <span class="chip">Chrome Android 138+</span>
+          <span class="chip">Web Serial + Bluetooth RFCOMM</span>
+        </div>
+        <h1>PortalCDS: demo de puerto serie Bluetooth</h1>
+        <p>
+          Esta página valida si Chrome en Android puede abrir un puerto serie Bluetooth SPP/RFCOMM
+          desde una web segura, leer datos y enviar comandos.
+        </p>
+      </header>
+
+      <section class="grid">
+        <article class="card stack">
+          <div class="row-3">
+            <label>
+              Baud rate
+              <input id="baudRate" type="number" min="300" step="1" value="9600" />
+            </label>
+            <label>
+              Fin de línea
+              <select id="lineEnding">
+                <option value="">Ninguno</option>
+                <option value="\r\n" selected>CRLF</option>
+                <option value="\n">LF</option>
+                <option value="\r">CR</option>
+              </select>
+            </label>
+            <label>
+              Estado
+              <input id="state" type="text" value="Listo para conectar" readonly />
+            </label>
+          </div>
+
+          <div class="row">
+            <button id="connectBtn">Seleccionar puerto SPP</button>
+            <button id="disconnectBtn" class="secondary" disabled>Desconectar</button>
+          </div>
+
+          <div class="row">
+            <label>
+              Comando a enviar
+              <input id="payload" type="text" value="AT" placeholder="Escribe un comando" />
+            </label>
+            <div class="stack" style="align-content:end;">
+              <button id="sendBtn" class="secondary" disabled>Enviar</button>
+              <button id="clearBtn" class="danger">Limpiar log</button>
+            </div>
+          </div>
+
+          <label>
+            Log
+            <pre id="log" aria-live="polite"></pre>
+          </label>
+        </article>
+
+        <aside class="card status stack">
+          <div class="badge"><span id="dot" class="dot"></span><strong id="statusText">Chequeo inicial</strong></div>
+          <div class="kvs">
+            <div><span>HTTPS</span><span id="httpsState">-</span></div>
+            <div><span>API serial</span><span id="serialState">-</span></div>
+            <div><span>Chrome Android</span><span id="chromeState">-</span></div>
+            <div><span>Puerto</span><span id="portState">Sin conectar</span></div>
+            <div><span>Servicio SPP</span><span id="sppState">00001101-0000-1000-8000-00805f9b34fb</span></div>
+          </div>
+          <p>
+            Si el dispositivo es realmente SPP/RFCOMM, Chrome Android 138+ debería poder exponerlo
+            como `SerialPort` y permitir `open/read/write`.
+          </p>
+        </aside>
+      </section>
+
+      <p class="foot">
+        URL esperada de publicación: <code>https://festix.github.io/PortalCDS/</code>.
+      </p>
+    </main>
+
+    <script>
+      const SPP_UUID = "00001101-0000-1000-8000-00805f9b34fb";
+
+      const el = {
+        baudRate: document.getElementById("baudRate"),
+        lineEnding: document.getElementById("lineEnding"),
+        state: document.getElementById("state"),
+        connectBtn: document.getElementById("connectBtn"),
+        disconnectBtn: document.getElementById("disconnectBtn"),
+        sendBtn: document.getElementById("sendBtn"),
+        clearBtn: document.getElementById("clearBtn"),
+        payload: document.getElementById("payload"),
+        log: document.getElementById("log"),
+        dot: document.getElementById("dot"),
+        statusText: document.getElementById("statusText"),
+        httpsState: document.getElementById("httpsState"),
+        serialState: document.getElementById("serialState"),
+        chromeState: document.getElementById("chromeState"),
+        portState: document.getElementById("portState"),
+        sppState: document.getElementById("sppState"),
+      };
+
+      const encoder = new TextEncoder();
+      let port = null;
+      let reader = null;
+      let writable = null;
+      let readLoopRunning = false;
+
+      function ts() {
+        return new Date().toLocaleTimeString();
+      }
+
+      function setStatus(text, level = "warn") {
+        el.statusText.textContent = text;
+        el.dot.className = `dot ${level}`;
+        el.state.value = text;
+      }
+
+      function log(message, kind = "INFO") {
+        el.log.textContent += `[${ts()}] ${kind}: ${message}\n`;
+        el.log.scrollTop = el.log.scrollHeight;
+      }
+
+      function setConnected(isConnected) {
+        el.connectBtn.disabled = isConnected;
+        el.disconnectBtn.disabled = !isConnected;
+        el.sendBtn.disabled = !isConnected;
+      }
+
+      function updateEnvironment() {
+        const secure = window.isSecureContext;
+        const serialSupported = "serial" in navigator;
+        el.httpsState.textContent = secure ? "OK" : "No";
+        el.serialState.textContent = serialSupported ? "Disponible" : "No disponible";
+        el.chromeState.textContent = /Chrome\/1(3[8-9]|[4-9]\d)/.test(navigator.userAgent) || /Chrome\/([2-9]\d{2,})/.test(navigator.userAgent)
+          ? "Probable 138+"
+          : "No verificado";
+        if (!secure) setStatus("Requiere HTTPS", "bad");
+        else if (!serialSupported) setStatus("Web Serial no disponible", "bad");
+        else setStatus("Listo para conectar", "good");
+      }
+
+      async function connect() {
+        if (!("serial" in navigator)) {
+          throw new Error("Este navegador no expone navigator.serial");
+        }
+
+        setStatus("Abriendo selector de puerto", "warn");
+        log(`Solicitando puerto con UUID SPP ${SPP_UUID}`);
+
+        const requestOptions = {
+          allowedBluetoothServiceClassIds: [SPP_UUID],
+          filters: [{ bluetoothServiceClassId: SPP_UUID }],
+        };
+
+        port = await navigator.serial.requestPort(requestOptions);
+        const baudRate = Number(el.baudRate.value) || 9600;
+
+        await port.open({ baudRate });
+
+        const info = typeof port.getInfo === "function" ? port.getInfo() : {};
+        el.portState.textContent = JSON.stringify(info) || "Conectado";
+        setConnected(true);
+        setStatus("Puerto abierto", "good");
+        log(`Puerto abierto con baudRate=${baudRate}`);
+        log(`Port info: ${JSON.stringify(info)}`);
+
+        readLoopRunning = true;
+        readLoop().catch((error) => {
+          log(error?.message || String(error), "RX-ERR");
+          setStatus("Lectura detenida", "bad");
+        });
+      }
+
+      async function readLoop() {
+        if (!port?.readable) return;
+
+        const decoder = new TextDecoderStream();
+        const readableStreamClosed = port.readable.pipeTo(decoder.writable);
+        reader = decoder.readable.getReader();
+
+        try {
+          while (readLoopRunning) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            if (value) log(value.replaceAll("\r", "\\r").replaceAll("\n", "\\n"), "RX");
+          }
+        } finally {
+          reader.releaseLock();
+          await readableStreamClosed.catch(() => {});
+        }
+      }
+
+      async function send() {
+        if (!port?.writable) throw new Error("No hay puerto abierto");
+        const ending = el.lineEnding.value;
+        const text = `${el.payload.value}${ending}`;
+        const writer = port.writable.getWriter();
+        try {
+          await writer.write(encoder.encode(text));
+          log(text.replaceAll("\r", "\\r").replaceAll("\n", "\\n"), "TX");
+        } finally {
+          writer.releaseLock();
+        }
+      }
+
+      async function disconnect() {
+        readLoopRunning = false;
+
+        if (reader) {
+          try {
+            await reader.cancel();
+          } catch (_) {}
+        }
+
+        if (writable) {
+          try {
+            writable.releaseLock();
+          } catch (_) {}
+        }
+
+        if (port) {
+          try {
+            await port.close();
+          } catch (error) {
+            log(error?.message || String(error), "ERR");
+          }
+        }
+
+        port = null;
+        reader = null;
+        writable = null;
+        el.portState.textContent = "Sin conectar";
+        setConnected(false);
+        setStatus("Desconectado", "warn");
+        log("Puerto cerrado");
+      }
+
+      el.connectBtn.addEventListener("click", async () => {
+        try {
+          await connect();
+        } catch (error) {
+          setStatus("No se pudo conectar", "bad");
+          log(error?.message || String(error), "ERR");
+          port = null;
+          setConnected(false);
+        }
+      });
+
+      el.disconnectBtn.addEventListener("click", async () => {
+        await disconnect();
+      });
+
+      el.sendBtn.addEventListener("click", async () => {
+        try {
+          await send();
+        } catch (error) {
+          log(error?.message || String(error), "ERR");
+          setStatus("Error al enviar", "bad");
+        }
+      });
+
+      el.clearBtn.addEventListener("click", () => {
+        el.log.textContent = "";
+      });
+
+      window.addEventListener("beforeunload", () => {
+        readLoopRunning = false;
+      });
+
+      updateEnvironment();
+      setConnected(false);
+      log("Demo iniciada");
+      log(`Secure context: ${window.isSecureContext}`);
+      log(`navigator.serial: ${"serial" in navigator}`);
+    </script>
+  </body>
+</html>
