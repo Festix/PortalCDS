@@ -1,6 +1,6 @@
 {
-  "device": "CDS Surtidor",
-  "module": "RN-41 / SPP Bluetooth",
+  "device": "CDS Mastermeter",
+  "module": "SPP Bluetooth",
   "connection": {
     "baudrate": 9600,
     "dataBits": 8,
@@ -9,7 +9,7 @@
     "flowControl": "none",
     "connectTimeoutMs": 15000,
     "retry": {
-      "maxAttempts": 5,
+      "maxAttempts": 6,
       "baseDelayMs": 1000,
       "maxDelayMs": 8000,
       "backoffMultiplier": 2
@@ -29,17 +29,17 @@
     "maxIntervalMs": 60000
   },
   "fields": [
-    {"index": 0, "name": "", "unit": "", "type": "string|number", "description": ""},
-    {"index": 1, "name": "", "unit": "", "type": "string|number", "description": ""},
-    {"index": 2, "name": "", "unit": "", "type": "string|number", "description": ""},
-    {"index": 3, "name": "", "unit": "", "type": "string|number", "description": ""},
-    {"index": 4, "name": "", "unit": "", "type": "string|number", "description": ""},
-    {"index": 5, "name": "", "unit": "", "type": "string|number", "description": ""},
-    {"index": 6, "name": "", "unit": "", "type": "string|number", "description": ""},
-    {"index": 7, "name": "", "unit": "", "type": "string|number", "description": ""},
-    {"index": 8, "name": "", "unit": "", "type": "string|number", "description": ""},
-    {"index": 9, "name": "", "unit": "", "type": "string|number", "description": ""},
-    {"index": 10, "name": "", "unit": "", "type": "string|number", "description": ""},
+    {"index": 0, "name": "v", "unit": "--", "type": "string|number", "description": ""},
+    {"index": 1, "name": "masa", "unit": "", "type": "number", "description": "masa acumulada"},
+    {"index": 2, "name": "caudal", "unit": "g/s", "type": "string|number", "description": "Caudal"},
+    {"index": 3, "name": "presion", "unit": "bar", "type": "string|number", "description": "presion"},
+    {"index": 4, "name": "temperatura", "unit": "C", "type": "string|number", "description": "temperatura"},
+    {"index": 5, "name": "tension", "unit": "V", "type": "string|number", "description": "tension"},
+    {"index": 6, "name": "aforador", "unit": "", "type": "string|number", "description": "aforador"},
+    {"index": 7, "name": "cargas counter", "unit": "cnt", "type": "number", "description": "cargas"},
+    {"index": 8, "name": "unidades", "unit": "unit", "type": "number", "description": "unidades"},
+    {"index": 9, "name": "energia", "unit": "conf", "type": "string|number", "description": "energia"},
+    {"index": 10, "name": "A/T", "unit": "conf", "type": "string|number", "description": "auto tara"},
     {"index": 11, "name": "", "unit": "", "type": "string|number", "description": ""}
   ]
 }
