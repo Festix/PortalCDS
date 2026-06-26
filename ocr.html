@@ -372,6 +372,20 @@
               ⚡ Ejecutar OCR (Tesseract)
             </button>
           </div>
+
+          <div class="stack" style="background: rgba(255,255,255,0.01); padding: 14px; border: 1px solid var(--line); border-radius: 14px;">
+            <strong style="color: var(--accent); font-size: 0.95rem;">OCR.space (Cloud)</strong>
+            <p style="font-size: 0.84rem; color: var(--muted);">
+              Envía la imagen procesada al servidor de OCR.space para comparar resultados con Tesseract.
+            </p>
+            <label>
+              API Key OCR.space
+              <input id="ocrSpaceKey" type="text" value="helloworld" placeholder="Tu API key o helloworld para pruebas" />
+            </label>
+            <button id="runCloudOcrBtn" class="secondary" style="width: 100%; height: 48px; font-size: 1rem;" disabled>
+              ☁️ Enviar a OCR.space
+            </button>
+          </div>
         </article>
 
         <aside class="card status stack">
@@ -463,6 +477,8 @@
         origCanvas: document.getElementById('origCanvas'),
         procCanvas: document.getElementById('procCanvas'),
         runOcrBtn: document.getElementById('runOcrBtn'),
+        runCloudOcrBtn: document.getElementById('runCloudOcrBtn'),
+        ocrSpaceKey: document.getElementById('ocrSpaceKey'),
         dot: document.getElementById('dot'),
         statusText: document.getElementById('statusText'),
         progressSection: document.getElementById('progressSection'),
@@ -528,6 +544,7 @@
             applyFilters();
             setStatus('Imagen lista para OCR', 'good');
             el.runOcrBtn.disabled = false;
+            el.runCloudOcrBtn.disabled = false;
           };
           originalImage.src = event.target.result;
         };
@@ -546,6 +563,7 @@
         el.procCanvas.width = 300; el.procCanvas.height = 150;
         
         el.runOcrBtn.disabled = true;
+        el.runCloudOcrBtn.disabled = true;
         el.importeInput.value = '';
         el.volumenInput.value = '';
         el.precioInput.value = '';
@@ -687,6 +705,15 @@
         ctxProc.putImageData(procImg, 0, 0);
       }
 
+      function canvasToBlob(canvas) {
+        return new Promise((resolve, reject) => {
+          canvas.toBlob((blob) => {
+            if (blob) resolve(blob);
+            else reject(new Error('No se pudo generar el blob de la imagen'));
+          }, 'image/png');
+        });
+      }
+
       // Execute Tesseract OCR over the processed canvas
       el.runOcrBtn.addEventListener('click', async () => {
         if (!originalImage) return;
@@ -743,6 +770,67 @@
             await worker.terminate().catch(() => {});
           }
           el.runOcrBtn.disabled = false;
+          el.captureBtn.disabled = false;
+          el.resetBtn.disabled = false;
+        }
+      });
+
+      el.runCloudOcrBtn.addEventListener('click', async () => {
+        if (!originalImage) return;
+
+        el.runOcrBtn.disabled = true;
+        el.runCloudOcrBtn.disabled = true;
+        el.captureBtn.disabled = true;
+        el.resetBtn.disabled = true;
+        el.progressSection.style.display = 'block';
+        el.progressBar.style.width = '0%';
+        el.progressPercent.textContent = '0%';
+        el.progressLabel.textContent = 'Preparando envío a OCR.space...';
+        setStatus('Enviando a OCR.space...', 'warn');
+
+        try {
+          const blob = await canvasToBlob(el.procCanvas);
+          const form = new FormData();
+          form.append('apikey', (el.ocrSpaceKey.value || 'helloworld').trim());
+          form.append('language', 'eng');
+          form.append('isOverlayRequired', 'false');
+          form.append('OCREngine', '3');
+          form.append('scale', 'false');
+          form.append('file', blob, 'dispensador.png');
+
+          const response = await fetch('https://api.ocr.space/parse/image', {
+            method: 'POST',
+            headers: {
+              apikey: (el.ocrSpaceKey.value || 'helloworld').trim(),
+            },
+            body: form,
+          });
+
+          const result = await response.json();
+          if (!response.ok || result?.IsErroredOnProcessing || !Array.isArray(result?.ParsedResults)) {
+            const msg = result?.ErrorMessage || result?.ErrorDetails || `HTTP ${response.status}`;
+            throw new Error(Array.isArray(msg) ? msg.join(' | ') : msg);
+          }
+
+          const text = (result.ParsedResults.map((r) => r.ParsedText || '').join('\n') || '').trim();
+          el.rawOcrResult.textContent = text || 'No se reconoció ningún texto.';
+
+          const numbers = findNumbers(text);
+          autoAssign(numbers);
+          renderDetectedNumbers(numbers);
+
+          setStatus('OCR.space finalizado', 'good');
+          el.progressLabel.textContent = 'Cloud OCR completado';
+          el.progressBar.style.width = '100%';
+          el.progressPercent.textContent = '100%';
+        } catch (error) {
+          console.error(error);
+          setStatus('Error en OCR.space', 'bad');
+          el.rawOcrResult.textContent = `Error: ${error?.message || String(error)}`;
+          el.progressLabel.textContent = 'Error al enviar al servidor.';
+        } finally {
+          el.runOcrBtn.disabled = false;
+          el.runCloudOcrBtn.disabled = false;
           el.captureBtn.disabled = false;
           el.resetBtn.disabled = false;
         }
