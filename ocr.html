@@ -377,36 +377,6 @@
             <button id="resetBtn" class="secondary">Restablecer</button>
           </div>
 
-          <!-- Dynamic Image Preprocessing Adjustments -->
-          <div class="stack" style="background: rgba(255,255,255,0.01); padding: 14px; border: 1px solid var(--line); border-radius: 14px;">
-            <div style="font-size: 0.95rem; font-weight: bold; color: var(--accent); margin-bottom: 6px;">
-              Filtros en tiempo real para displays (7 Segmentos)
-            </div>
-            
-            <div class="control-row">
-              <label style="display:contents;">
-                <span>Umbral de Contraste (Threshold)</span>
-                <input type="range" id="thresholdSlider" min="0" max="255" value="128" />
-                <span id="thresholdVal" class="val">128</span>
-              </label>
-            </div>
-
-            <div class="control-row" style="margin-top: 8px;">
-              <label style="display:contents;">
-                <span>Dilatación (Grosor dígitos)</span>
-                <input type="range" id="dilateSlider" min="0" max="5" value="1" />
-                <span id="dilateVal" class="val">1</span>
-              </label>
-            </div>
-
-            <div style="display: flex; gap: 16px; margin-top: 8px; font-size: 0.9rem;">
-              <label style="display: flex; flex-direction: row; align-items: center; gap: 8px; cursor: pointer;">
-                <input type="checkbox" id="invertCheckbox" style="width: 18px; height: 18px; margin: 0;" />
-                <span>Invertir Colores (Recomendado para LED brillante con fondo oscuro)</span>
-              </label>
-            </div>
-          </div>
-
           <!-- Preview Canvases -->
           <div class="canvas-container">
             <div class="canvas-box">
@@ -421,6 +391,34 @@
             <div class="canvas-box">
               <span>Binarizada (Lo que lee el OCR)</span>
               <canvas id="procCanvas"></canvas>
+              <div class="stack" style="width: 100%; background: rgba(255,255,255,0.01); padding: 14px; border: 1px solid var(--line); border-radius: 14px;">
+                <div style="font-size: 0.95rem; font-weight: bold; color: var(--accent); margin-bottom: 6px;">
+                  Ajustes de imagen binarizada
+                </div>
+                
+                <div class="control-row">
+                  <label style="display:contents;">
+                    <span>Umbral de Contraste (Threshold)</span>
+                    <input type="range" id="thresholdSlider" min="0" max="255" value="128" />
+                    <span id="thresholdVal" class="val">128</span>
+                  </label>
+                </div>
+
+                <div class="control-row" style="margin-top: 8px;">
+                  <label style="display:contents;">
+                    <span>Dilatación (Grosor dígitos)</span>
+                    <input type="range" id="dilateSlider" min="0" max="5" value="1" />
+                    <span id="dilateVal" class="val">1</span>
+                  </label>
+                </div>
+
+                <div style="display: flex; gap: 16px; margin-top: 8px; font-size: 0.9rem;">
+                  <label style="display: flex; flex-direction: row; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="checkbox" id="invertCheckbox" style="width: 18px; height: 18px; margin: 0;" />
+                    <span>Invertir Colores (Recomendado para LED brillante con fondo oscuro)</span>
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
 
