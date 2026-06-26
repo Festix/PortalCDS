@@ -15,6 +15,7 @@ Do not use for: refactoring, writing scripts from scratch, debugging business lo
 
 - `index.html` is the active CDS Bluetooth/Web Serial validation page.
 - `cds-protocol.json` is the source of truth for the CDS protocol description used by the UI.
+- `documentacion/protocolo-cds.md` is the editable human-readable protocol reference derived from the vendor PDF.
 - Current CDS target: `CDS Mastermeter` over Bluetooth SPP/UART at `9600 8N1`.
 - Current connection strategy in `index.html` uses a `15000 ms` open timeout plus retry/backoff logic. Keep protocol-level values aligned with `cds-protocol.json`.
 - Current polling command is fixed to `:v;` with default interval `4000 ms`.
