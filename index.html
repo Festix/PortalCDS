@@ -166,6 +166,50 @@
         font-size: 0.9rem;
       }
 
+      .fields-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+      }
+
+      .field-card {
+        display: grid;
+        gap: 6px;
+        padding: 12px;
+        border-radius: 14px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .field-name {
+        font-size: 0.76rem;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
+      .field-value {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--text);
+        font-variant-numeric: tabular-nums;
+        word-break: break-word;
+      }
+
+      .field-meta {
+        font-size: 0.78rem;
+        color: var(--muted);
+      }
+
+      .inline-note {
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: rgba(255,255,255,0.04);
+        border: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 0.88rem;
+      }
+
       @media (max-width: 900px) {
         .grid, .row, .row-3 { grid-template-columns: 1fr; }
       }
@@ -224,16 +268,11 @@
           <div class="row-3">
             <label>
               Baud rate
-              <input id="baudRate" type="number" min="300" step="1" value="9600" />
+              <input id="baudRate" type="text" value="9600 fijo" readonly />
             </label>
             <label>
-              Fin de línea
-              <select id="lineEnding">
-                <option value="">Ninguno</option>
-                <option value="\r\n" selected>CRLF</option>
-                <option value="\n">LF</option>
-                <option value="\r">CR</option>
-              </select>
+              Intervalo de consulta (ms)
+              <input id="pollInterval" type="number" min="1000" max="60000" step="500" value="4000" />
             </label>
             <label>
               Estado
@@ -247,15 +286,20 @@
           </div>
 
           <div class="row">
-            <label>
-              Comando a enviar
-              <input id="payload" type="text" value="AT" placeholder="Escribe un comando" />
-            </label>
             <div class="stack" style="align-content:end;">
-              <button id="sendBtn" class="secondary" disabled>Enviar</button>
+              <button id="pollBtn" class="secondary" disabled>Iniciar consulta</button>
+              <button id="sendBtn" class="secondary" disabled>Consultar ahora (:v;)</button>
               <button id="clearBtn" class="danger">Limpiar log</button>
             </div>
+            <div class="inline-note">
+              El comando CDS es fijo: <code>:v;</code>. No usa terminador adicional.
+            </div>
           </div>
+
+          <label>
+            Ultimo frame CDS
+            <pre id="frameView">Sin datos</pre>
+          </label>
 
           <label>
             Log
@@ -276,6 +320,14 @@
             Si el dispositivo es realmente SPP/RFCOMM, Chrome Android 138+ debería poder exponerlo
             como `SerialPort` y permitir `open/read/write`.
           </p>
+
+          <div class="stack">
+            <strong>Datos CDS</strong>
+            <div id="fieldsGrid" class="fields-grid"></div>
+            <div class="inline-note">
+              Ultima actualizacion: <span id="lastUpdate">-</span>
+            </div>
+          </div>
         </aside>
       </section>
 
@@ -286,16 +338,58 @@
 
     <script>
       const SPP_UUID = "00001101-0000-1000-8000-00805f9b34fb";
+      const CDS_COMMAND = ":v;";
+      const DEFAULT_PROTOCOL = {
+        device: "CDS Surtidor",
+        module: "RN-41 / SPP Bluetooth",
+        connection: {
+          baudrate: 9600,
+          dataBits: 8,
+          stopBits: 1,
+          parity: "none",
+          flowControl: "none",
+          connectTimeoutMs: 15000,
+          retry: {
+            maxAttempts: 5,
+            baseDelayMs: 1000,
+            maxDelayMs: 8000,
+            backoffMultiplier: 2,
+          },
+        },
+        protocol: {
+          command: CDS_COMMAND,
+          responseFormat: ":field0|field1|field2|field3|field4|field5|field6|field7|field8|field9|field10|field11;",
+          header: ":",
+          separator: "|",
+          tail: ";",
+          maxFields: 12,
+        },
+        polling: {
+          defaultIntervalMs: 4000,
+          minIntervalMs: 1000,
+          maxIntervalMs: 60000,
+        },
+        fields: Array.from({ length: 12 }, (_, index) => ({
+          index,
+          name: "",
+          unit: "",
+          type: "string|number",
+          description: "",
+        })),
+      };
 
       const el = {
         baudRate: document.getElementById("baudRate"),
-        lineEnding: document.getElementById("lineEnding"),
+        pollInterval: document.getElementById("pollInterval"),
         state: document.getElementById("state"),
         connectBtn: document.getElementById("connectBtn"),
         disconnectBtn: document.getElementById("disconnectBtn"),
+        pollBtn: document.getElementById("pollBtn"),
         sendBtn: document.getElementById("sendBtn"),
         clearBtn: document.getElementById("clearBtn"),
-        payload: document.getElementById("payload"),
+        frameView: document.getElementById("frameView"),
+        fieldsGrid: document.getElementById("fieldsGrid"),
+        lastUpdate: document.getElementById("lastUpdate"),
         log: document.getElementById("log"),
         dot: document.getElementById("dot"),
         statusText: document.getElementById("statusText"),
@@ -309,11 +403,30 @@
       const encoder = new TextEncoder();
       let port = null;
       let reader = null;
-      let writable = null;
       let readLoopRunning = false;
+      let pollTimer = null;
+      let rxBuffer = "";
+      let protocolSpec = DEFAULT_PROTOCOL;
 
       function ts() {
         return new Date().toLocaleTimeString();
+      }
+
+      function sleep(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+      }
+
+      async function withTimeout(promise, timeoutMs, label) {
+        let timeoutId = null;
+        const timeoutPromise = new Promise((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error(`${label} excedio ${timeoutMs} ms`)), timeoutMs);
+        });
+
+        try {
+          return await Promise.race([promise, timeoutPromise]);
+        } finally {
+          clearTimeout(timeoutId);
+        }
       }
 
       function setStatus(text, level = "warn") {
@@ -331,6 +444,75 @@
         el.connectBtn.disabled = isConnected;
         el.disconnectBtn.disabled = !isConnected;
         el.sendBtn.disabled = !isConnected;
+        el.pollBtn.disabled = !isConnected;
+        if (!isConnected) {
+          el.pollBtn.textContent = "Iniciar consulta";
+        }
+      }
+
+      function isPolling() {
+        return pollTimer !== null;
+      }
+
+      function getRetryConfig() {
+        return protocolSpec?.connection?.retry || DEFAULT_PROTOCOL.connection.retry;
+      }
+
+      function getConnectTimeoutMs() {
+        return protocolSpec?.connection?.connectTimeoutMs || DEFAULT_PROTOCOL.connection.connectTimeoutMs;
+      }
+
+      function getPollingIntervalMs() {
+        const fallback = protocolSpec?.polling?.defaultIntervalMs || DEFAULT_PROTOCOL.polling.defaultIntervalMs;
+        const min = protocolSpec?.polling?.minIntervalMs || DEFAULT_PROTOCOL.polling.minIntervalMs;
+        const max = protocolSpec?.polling?.maxIntervalMs || DEFAULT_PROTOCOL.polling.maxIntervalMs;
+        const rawValue = Number(el.pollInterval.value);
+        if (!Number.isFinite(rawValue)) return fallback;
+        return Math.min(max, Math.max(min, rawValue));
+      }
+
+      function stopPolling() {
+        if (pollTimer !== null) {
+          clearInterval(pollTimer);
+          pollTimer = null;
+        }
+        if (port) {
+          el.pollBtn.textContent = "Iniciar consulta";
+        }
+      }
+
+      function renderFieldCards() {
+        const fields = protocolSpec?.fields?.length ? protocolSpec.fields : DEFAULT_PROTOCOL.fields;
+        el.fieldsGrid.innerHTML = "";
+
+        fields.forEach((field, index) => {
+          const card = document.createElement("div");
+          const name = field.name?.trim() || `Campo ${index}`;
+          const unit = field.unit?.trim() ? ` (${field.unit.trim()})` : "";
+          const description = field.description?.trim() || "Pendiente de documentar";
+
+          card.className = "field-card";
+          card.innerHTML = `
+            <div class="field-name">${name}${unit}</div>
+            <div class="field-value" id="field-${index}">-</div>
+            <div class="field-meta">Indice ${index} · ${description}</div>
+          `;
+          el.fieldsGrid.appendChild(card);
+        });
+      }
+
+      async function loadProtocol() {
+        try {
+          const response = await fetch("./cds-protocol.json", { cache: "no-store" });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          protocolSpec = await response.json();
+        } catch (error) {
+          protocolSpec = DEFAULT_PROTOCOL;
+          log(`No se pudo cargar cds-protocol.json: ${error?.message || String(error)}`, "WARN");
+        }
+
+        el.pollInterval.value = protocolSpec?.polling?.defaultIntervalMs || DEFAULT_PROTOCOL.polling.defaultIntervalMs;
+        renderFieldCards();
       }
 
       function updateEnvironment() {
@@ -344,6 +526,26 @@
         if (!secure) setStatus("Requiere HTTPS", "bad");
         else if (!serialSupported) setStatus("Web Serial no disponible", "bad");
         else setStatus("Listo para conectar", "good");
+      }
+
+      async function closeCurrentPort() {
+        readLoopRunning = false;
+
+        if (reader) {
+          try {
+            await reader.cancel();
+          } catch (_) {}
+        }
+
+        if (port) {
+          try {
+            await port.close();
+          } catch (_) {}
+        }
+
+        port = null;
+        reader = null;
+        rxBuffer = "";
       }
 
       async function connect() {
@@ -360,22 +562,91 @@
         };
 
         port = await navigator.serial.requestPort(requestOptions);
-        const baudRate = Number(el.baudRate.value) || 9600;
 
-        await port.open({ baudRate });
+        const retry = getRetryConfig();
+        const connectTimeoutMs = getConnectTimeoutMs();
+        let lastError = null;
+
+        for (let attempt = 1; attempt <= retry.maxAttempts; attempt += 1) {
+          try {
+            setStatus(`Conectando intento ${attempt}/${retry.maxAttempts}`, "warn");
+            log(`Intento ${attempt}/${retry.maxAttempts} de apertura a 9600 bps`);
+            await withTimeout(
+              port.open({
+                baudRate: 9600,
+                dataBits: 8,
+                stopBits: 1,
+                parity: "none",
+                flowControl: "none",
+              }),
+              connectTimeoutMs,
+              "Apertura del puerto"
+            );
+            lastError = null;
+            break;
+          } catch (error) {
+            lastError = error;
+            log(error?.message || String(error), "OPEN-ERR");
+
+            if (attempt < retry.maxAttempts) {
+              const delayMs = Math.min(
+                retry.maxDelayMs,
+                retry.baseDelayMs * Math.pow(retry.backoffMultiplier, attempt - 1)
+              );
+              setStatus(`Reintentando en ${delayMs} ms`, "warn");
+              try {
+                await port.close();
+              } catch (_) {}
+              await sleep(delayMs);
+            }
+          }
+        }
+
+        if (lastError) {
+          await closeCurrentPort();
+          throw lastError;
+        }
 
         const info = typeof port.getInfo === "function" ? port.getInfo() : {};
         el.portState.textContent = JSON.stringify(info) || "Conectado";
         setConnected(true);
         setStatus("Puerto abierto", "good");
-        log(`Puerto abierto con baudRate=${baudRate}`);
+        log("Puerto abierto con baudRate=9600");
         log(`Port info: ${JSON.stringify(info)}`);
 
+        rxBuffer = "";
         readLoopRunning = true;
         readLoop().catch((error) => {
           log(error?.message || String(error), "RX-ERR");
           setStatus("Lectura detenida", "bad");
+          stopPolling();
         });
+      }
+
+      function parseFrame(frame) {
+        const protocol = protocolSpec?.protocol || DEFAULT_PROTOCOL.protocol;
+        const trimmed = frame.trim();
+
+        if (!trimmed.startsWith(protocol.header) || !trimmed.endsWith(protocol.tail)) {
+          return null;
+        }
+
+        const body = trimmed.slice(protocol.header.length, trimmed.length - protocol.tail.length);
+        const values = body === "" ? [] : body.split(protocol.separator);
+        const maxFields = protocol.maxFields || DEFAULT_PROTOCOL.protocol.maxFields;
+
+        return Array.from({ length: maxFields }, (_, index) => values[index] ?? "");
+      }
+
+      function updateFields(parsedValues, rawFrame) {
+        parsedValues.forEach((value, index) => {
+          const fieldEl = document.getElementById(`field-${index}`);
+          if (!fieldEl) return;
+          fieldEl.textContent = value === "" ? "-" : value;
+        });
+
+        el.frameView.textContent = rawFrame;
+        el.lastUpdate.textContent = ts();
       }
 
       async function readLoop() {
@@ -389,7 +660,30 @@
           while (readLoopRunning) {
             const { value, done } = await reader.read();
             if (done) break;
-            if (value) log(value.replaceAll("\r", "\\r").replaceAll("\n", "\\n"), "RX");
+            if (!value) continue;
+
+            log(value.replaceAll("\r", "\\r").replaceAll("\n", "\\n"), "RX");
+            rxBuffer += value;
+
+            let frameEnd = rxBuffer.indexOf(";");
+            while (frameEnd !== -1) {
+              const candidate = rxBuffer.slice(0, frameEnd + 1);
+              rxBuffer = rxBuffer.slice(frameEnd + 1);
+              const frameStart = candidate.lastIndexOf(":");
+              const frame = frameStart === -1 ? "" : candidate.slice(frameStart);
+
+              if (frame) {
+                const parsedValues = parseFrame(frame);
+                if (parsedValues) {
+                  updateFields(parsedValues, frame);
+                  log(`Frame parseado con ${parsedValues.filter((item) => item !== "").length} campos`, "FRAME");
+                } else {
+                  log(`Frame invalido: ${frame}`, "FRAME-ERR");
+                }
+              }
+
+              frameEnd = rxBuffer.indexOf(";");
+            }
           }
         } finally {
           reader.releaseLock();
@@ -399,29 +693,47 @@
 
       async function send() {
         if (!port?.writable) throw new Error("No hay puerto abierto");
-        const ending = el.lineEnding.value;
-        const text = `${el.payload.value}${ending}`;
         const writer = port.writable.getWriter();
         try {
-          await writer.write(encoder.encode(text));
-          log(text.replaceAll("\r", "\\r").replaceAll("\n", "\\n"), "TX");
+          await writer.write(encoder.encode(CDS_COMMAND));
+          log(CDS_COMMAND, "TX");
         } finally {
           writer.releaseLock();
         }
       }
 
+      async function togglePolling() {
+        if (!port) return;
+
+        if (isPolling()) {
+          stopPolling();
+          setStatus("Consulta periodica detenida", "warn");
+          log("Polling detenido");
+          return;
+        }
+
+        const intervalMs = getPollingIntervalMs();
+        el.pollInterval.value = intervalMs;
+        pollTimer = setInterval(() => {
+          send().catch((error) => {
+            log(error?.message || String(error), "POLL-ERR");
+            setStatus("Error durante polling", "bad");
+            stopPolling();
+          });
+        }, intervalMs);
+        el.pollBtn.textContent = "Detener consulta";
+        setStatus(`Consulta periodica cada ${intervalMs} ms`, "good");
+        log(`Polling iniciado cada ${intervalMs} ms`);
+        await send();
+      }
+
       async function disconnect() {
+        stopPolling();
         readLoopRunning = false;
 
         if (reader) {
           try {
             await reader.cancel();
-          } catch (_) {}
-        }
-
-        if (writable) {
-          try {
-            writable.releaseLock();
           } catch (_) {}
         }
 
@@ -435,8 +747,10 @@
 
         port = null;
         reader = null;
-        writable = null;
+        rxBuffer = "";
         el.portState.textContent = "Sin conectar";
+        el.frameView.textContent = "Sin datos";
+        el.lastUpdate.textContent = "-";
         setConnected(false);
         setStatus("Desconectado", "warn");
         log("Puerto cerrado");
@@ -446,15 +760,26 @@
         try {
           await connect();
         } catch (error) {
+          await closeCurrentPort();
           setStatus("No se pudo conectar", "bad");
           log(error?.message || String(error), "ERR");
-          port = null;
+          el.portState.textContent = "Sin conectar";
           setConnected(false);
         }
       });
 
       el.disconnectBtn.addEventListener("click", async () => {
         await disconnect();
+      });
+
+      el.pollBtn.addEventListener("click", async () => {
+        try {
+          await togglePolling();
+        } catch (error) {
+          log(error?.message || String(error), "ERR");
+          setStatus("No se pudo iniciar la consulta", "bad");
+          stopPolling();
+        }
       });
 
       el.sendBtn.addEventListener("click", async () => {
@@ -472,10 +797,13 @@
 
       window.addEventListener("beforeunload", () => {
         readLoopRunning = false;
+        stopPolling();
       });
 
       updateEnvironment();
       setConnected(false);
+      renderFieldCards();
+      loadProtocol();
       log("Demo iniciada");
       log(`Secure context: ${window.isSecureContext}`);
       log(`navigator.serial: ${"serial" in navigator}`);

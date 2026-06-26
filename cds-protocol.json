@@ -1,0 +1,45 @@
+{
+  "device": "CDS Surtidor",
+  "module": "RN-41 / SPP Bluetooth",
+  "connection": {
+    "baudrate": 9600,
+    "dataBits": 8,
+    "stopBits": 1,
+    "parity": "none",
+    "flowControl": "none",
+    "connectTimeoutMs": 15000,
+    "retry": {
+      "maxAttempts": 5,
+      "baseDelayMs": 1000,
+      "maxDelayMs": 8000,
+      "backoffMultiplier": 2
+    }
+  },
+  "protocol": {
+    "command": ":v;",
+    "responseFormat": ":field0|field1|field2|field3|field4|field5|field6|field7|field8|field9|field10|field11;",
+    "header": ":",
+    "separator": "|",
+    "tail": ";",
+    "maxFields": 12
+  },
+  "polling": {
+    "defaultIntervalMs": 4000,
+    "minIntervalMs": 1000,
+    "maxIntervalMs": 60000
+  },
+  "fields": [
+    {"index": 0, "name": "", "unit": "", "type": "string|number", "description": ""},
+    {"index": 1, "name": "", "unit": "", "type": "string|number", "description": ""},
+    {"index": 2, "name": "", "unit": "", "type": "string|number", "description": ""},
+    {"index": 3, "name": "", "unit": "", "type": "string|number", "description": ""},
+    {"index": 4, "name": "", "unit": "", "type": "string|number", "description": ""},
+    {"index": 5, "name": "", "unit": "", "type": "string|number", "description": ""},
+    {"index": 6, "name": "", "unit": "", "type": "string|number", "description": ""},
+    {"index": 7, "name": "", "unit": "", "type": "string|number", "description": ""},
+    {"index": 8, "name": "", "unit": "", "type": "string|number", "description": ""},
+    {"index": 9, "name": "", "unit": "", "type": "string|number", "description": ""},
+    {"index": 10, "name": "", "unit": "", "type": "string|number", "description": ""},
+    {"index": 11, "name": "", "unit": "", "type": "string|number", "description": ""}
+  ]
+}
