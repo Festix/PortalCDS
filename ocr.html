@@ -700,28 +700,27 @@
         el.progressLabel.textContent = 'Iniciando Tesseract...';
         setStatus('Ejecutando OCR...', 'warn');
 
-        try {
-          // Standard Tesseract OCR with digits whitelist
-          const result = await Tesseract.recognize(
-            el.procCanvas,
-            'eng',
-            {
-              logger: m => {
-                if (m.status === 'recognizing text') {
-                  const pct = Math.round(m.progress * 100);
-                  el.progressBar.style.width = `${pct}%`;
-                  el.progressPercent.textContent = `${pct}%`;
-                  el.progressLabel.textContent = 'Reconociendo caracteres...';
-                } else {
-                  el.progressLabel.textContent = m.status;
-                }
-              },
-              workerParams: {
-                tesseract_char_whitelist: '0123456789., \n'
-              }
-            }
-          );
+        let worker = null;
 
+        try {
+          worker = await Tesseract.createWorker('eng', 1, {
+            logger: (m) => {
+              if (m.status === 'recognizing text') {
+                const pct = Math.round(m.progress * 100);
+                el.progressBar.style.width = `${pct}%`;
+                el.progressPercent.textContent = `${pct}%`;
+                el.progressLabel.textContent = 'Reconociendo caracteres...';
+              } else {
+                el.progressLabel.textContent = m.status;
+              }
+            },
+          });
+
+          await worker.setParameters({
+            tessedit_char_whitelist: '0123456789.,',
+          });
+
+          const result = await worker.recognize(el.procCanvas);
           const text = result.data.text || '';
           el.rawOcrResult.textContent = text.trim() || 'No se reconoció ningún texto.';
           
@@ -740,6 +739,9 @@
           el.rawOcrResult.textContent = `Error: ${error?.message || String(error)}`;
           el.progressLabel.textContent = 'Error durante el proceso.';
         } finally {
+          if (worker) {
+            await worker.terminate().catch(() => {});
+          }
           el.runOcrBtn.disabled = false;
           el.captureBtn.disabled = false;
           el.resetBtn.disabled = false;
