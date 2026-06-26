@@ -17,11 +17,13 @@
   },
   "protocol": {
     "command": ":v;",
-    "responseFormat": ":field0|field1|field2|field3|field4|field5|field6|field7|field8|field9|field10|field11;",
+    "responseFormat": ":v|<masa>|<caudal>|<presion>|<temperatura>|<tension>|<aforador>|<cargas>|<unidades>|<energia>|<auto_tara>|;",
     "header": ":",
     "separator": "|",
     "tail": ";",
-    "maxFields": 12
+    "responsePrefix": "v",
+    "ignoreTrailingEmptyField": true,
+    "maxFields": 10
   },
   "polling": {
     "defaultIntervalMs": 4000,
@@ -29,17 +31,28 @@
     "maxIntervalMs": 60000
   },
   "fields": [
-    {"index": 0, "name": "v", "unit": "--", "type": "string|number", "description": ""},
-    {"index": 1, "name": "masa", "unit": "", "type": "number", "description": "masa acumulada"},
-    {"index": 2, "name": "caudal", "unit": "g/s", "type": "string|number", "description": "Caudal"},
-    {"index": 3, "name": "presion", "unit": "bar", "type": "string|number", "description": "presion"},
-    {"index": 4, "name": "temperatura", "unit": "C", "type": "string|number", "description": "temperatura"},
-    {"index": 5, "name": "tension", "unit": "V", "type": "string|number", "description": "tension"},
-    {"index": 6, "name": "aforador", "unit": "", "type": "string|number", "description": "aforador"},
-    {"index": 7, "name": "cargas counter", "unit": "cnt", "type": "number", "description": "cargas"},
-    {"index": 8, "name": "unidades", "unit": "unit", "type": "number", "description": "unidades"},
-    {"index": 9, "name": "energia", "unit": "conf", "type": "string|number", "description": "energia"},
-    {"index": 10, "name": "A/T", "unit": "conf", "type": "string|number", "description": "auto tara"},
-    {"index": 11, "name": "", "unit": "", "type": "string|number", "description": ""}
+    {"index": 0, "name": "masa", "unit": "", "type": "number", "description": "Masa acumulada mostrada por el equipo, segun unidad seleccionada", "format": {"decimals": 3}},
+    {"index": 1, "name": "caudal", "unit": "g/s", "type": "number", "description": "Caudal instantaneo", "format": {"decimals": 1}},
+    {"index": 2, "name": "presion", "unit": "bar", "type": "number", "description": "Presion medida", "format": {"decimals": 1}},
+    {"index": 3, "name": "temperatura", "unit": "C", "type": "number", "description": "Temperatura informada por el sensor", "format": {"decimals": 1}},
+    {"index": 4, "name": "tension", "unit": "V", "type": "number", "description": "Tension de alimentacion o bateria", "format": {"decimals": 1}},
+    {"index": 5, "name": "aforador", "unit": "cnt", "type": "number", "description": "Contador acumulado del aforador"},
+    {"index": 6, "name": "cargas", "unit": "cnt", "type": "number", "description": "Cantidad de cargas registradas"},
+    {"index": 7, "name": "unidades", "unit": "", "type": "enum", "description": "Unidad seleccionada para masa", "values": {"1": "kg", "2": "gramos"}},
+    {"index": 8, "name": "energia", "unit": "", "type": "enum", "description": "Estado del modo ahorro de energia", "values": {"0": "desactivado", "1": "activado"}},
+    {"index": 9, "name": "auto tara", "unit": "", "type": "enum", "description": "Estado del modo auto tara", "values": {"0": "desactivada", "1": "activada"}}
+  ],
+  "commands": [
+    {"command": ":v;", "type": "read", "description": "Consulta variables principales", "response": ":v|...|;"},
+    {"command": ":M0;", "type": "action", "description": "Reset de masa", "response": ":M0;"},
+    {"command": ":Z;", "type": "action", "description": "Ajuste de cero", "response": ":Z;"},
+    {"command": ":U1; / :U2;", "type": "write", "description": "Seleccion de unidades", "response": ":U<unidad>;"},
+    {"command": ":u;", "type": "read", "description": "Consulta unidad actual", "response": ":u<unidad>;"},
+    {"command": ":E0; / :E1;", "type": "write", "description": "Ahorro de energia", "response": ":E<estado>;"},
+    {"command": ":e;", "type": "read", "description": "Consulta ahorro de energia", "response": ":e<estado>;"},
+    {"command": ":T0; / :T1;", "type": "write", "description": "Auto tara", "response": ":T<estado>;"},
+    {"command": ":t;", "type": "read", "description": "Consulta auto tara", "response": ":t<estado>;"},
+    {"command": ":L0; / :L1;", "type": "write", "description": "Backlight", "response": "sin respuesta"},
+    {"command": ":ResetAforador;", "type": "action", "description": "Resetea aforador y cargas", "response": "AOK"}
   ]
 }

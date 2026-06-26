@@ -358,24 +358,31 @@
         },
         protocol: {
           command: CDS_COMMAND,
-          responseFormat: ":field0|field1|field2|field3|field4|field5|field6|field7|field8|field9|field10|field11;",
+          responseFormat: ":v|<masa>|<caudal>|<presion>|<temperatura>|<tension>|<aforador>|<cargas>|<unidades>|<energia>|<auto_tara>|;",
           header: ":",
           separator: "|",
           tail: ";",
-          maxFields: 12,
+          responsePrefix: "v",
+          ignoreTrailingEmptyField: true,
+          maxFields: 10,
         },
         polling: {
           defaultIntervalMs: 4000,
           minIntervalMs: 1000,
           maxIntervalMs: 60000,
         },
-        fields: Array.from({ length: 12 }, (_, index) => ({
-          index,
-          name: "",
-          unit: "",
-          type: "string|number",
-          description: "",
-        })),
+        fields: [
+          { index: 0, name: "masa", unit: "", type: "number", description: "Masa acumulada mostrada por el equipo, segun unidad seleccionada", format: { decimals: 3 } },
+          { index: 1, name: "caudal", unit: "g/s", type: "number", description: "Caudal instantaneo", format: { decimals: 1 } },
+          { index: 2, name: "presion", unit: "bar", type: "number", description: "Presion medida", format: { decimals: 1 } },
+          { index: 3, name: "temperatura", unit: "C", type: "number", description: "Temperatura informada por el sensor", format: { decimals: 1 } },
+          { index: 4, name: "tension", unit: "V", type: "number", description: "Tension de alimentacion o bateria", format: { decimals: 1 } },
+          { index: 5, name: "aforador", unit: "cnt", type: "number", description: "Contador acumulado del aforador" },
+          { index: 6, name: "cargas", unit: "cnt", type: "number", description: "Cantidad de cargas registradas" },
+          { index: 7, name: "unidades", unit: "", type: "enum", description: "Unidad seleccionada para masa", values: { "1": "kg", "2": "gramos" } },
+          { index: 8, name: "energia", unit: "", type: "enum", description: "Estado del modo ahorro de energia", values: { "0": "desactivado", "1": "activado" } },
+          { index: 9, name: "auto tara", unit: "", type: "enum", description: "Estado del modo auto tara", values: { "0": "desactivada", "1": "activada" } },
+        ],
       };
 
       const el = {
@@ -499,6 +506,25 @@
           `;
           el.fieldsGrid.appendChild(card);
         });
+      }
+
+      function formatFieldValue(field, rawValue) {
+        if (rawValue === "") return "-";
+
+        if (field?.type === "enum") {
+          const mapped = field?.values?.[rawValue];
+          return mapped ? `${rawValue} (${mapped})` : rawValue;
+        }
+
+        if (field?.type === "number") {
+          const parsed = Number(rawValue);
+          if (!Number.isNaN(parsed) && Number.isFinite(parsed)) {
+            const decimals = field?.format?.decimals;
+            return typeof decimals === "number" ? parsed.toFixed(decimals) : String(parsed);
+          }
+        }
+
+        return rawValue;
       }
 
       async function loadProtocol() {
@@ -632,8 +658,20 @@
         }
 
         const body = trimmed.slice(protocol.header.length, trimmed.length - protocol.tail.length);
-        const values = body === "" ? [] : body.split(protocol.separator);
-        const maxFields = protocol.maxFields || DEFAULT_PROTOCOL.protocol.maxFields;
+        const rawValues = body === "" ? [] : body.split(protocol.separator);
+        const responsePrefix = protocol.responsePrefix || "";
+        const ignoreTrailingEmptyField = protocol.ignoreTrailingEmptyField !== false;
+        const values = [...rawValues];
+
+        if (responsePrefix && values[0] === responsePrefix) {
+          values.shift();
+        }
+
+        if (ignoreTrailingEmptyField && values.length && values[values.length - 1] === "") {
+          values.pop();
+        }
+
+        const maxFields = protocolSpec?.fields?.length || protocol.maxFields || DEFAULT_PROTOCOL.protocol.maxFields;
 
         return Array.from({ length: maxFields }, (_, index) => values[index] ?? "");
       }
@@ -642,7 +680,8 @@
         parsedValues.forEach((value, index) => {
           const fieldEl = document.getElementById(`field-${index}`);
           if (!fieldEl) return;
-          fieldEl.textContent = value === "" ? "-" : value;
+          const field = protocolSpec?.fields?.[index] || DEFAULT_PROTOCOL.fields[index] || null;
+          fieldEl.textContent = formatFieldValue(field, value);
         });
 
         el.frameView.textContent = rawFrame;
