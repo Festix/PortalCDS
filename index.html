@@ -289,6 +289,7 @@
             <div class="stack" style="align-content:end;">
               <button id="pollBtn" class="secondary" disabled>Iniciar consulta</button>
               <button id="sendBtn" class="secondary" disabled>Consultar ahora (:v;)</button>
+              <button id="resetMassBtn" class="secondary" disabled>Reset masa (:M0;)</button>
               <button id="clearBtn" class="danger">Limpiar log</button>
             </div>
             <div class="inline-note">
@@ -393,6 +394,7 @@
         disconnectBtn: document.getElementById("disconnectBtn"),
         pollBtn: document.getElementById("pollBtn"),
         sendBtn: document.getElementById("sendBtn"),
+        resetMassBtn: document.getElementById("resetMassBtn"),
         clearBtn: document.getElementById("clearBtn"),
         frameView: document.getElementById("frameView"),
         fieldsGrid: document.getElementById("fieldsGrid"),
@@ -451,6 +453,7 @@
         el.connectBtn.disabled = isConnected;
         el.disconnectBtn.disabled = !isConnected;
         el.sendBtn.disabled = !isConnected;
+        el.resetMassBtn.disabled = !isConnected;
         el.pollBtn.disabled = !isConnected;
         if (!isConnected) {
           el.pollBtn.textContent = "Iniciar consulta";
@@ -730,15 +733,24 @@
         }
       }
 
-      async function send() {
+      async function sendCommand(command) {
         if (!port?.writable) throw new Error("No hay puerto abierto");
         const writer = port.writable.getWriter();
         try {
-          await writer.write(encoder.encode(CDS_COMMAND));
-          log(CDS_COMMAND, "TX");
+          await writer.write(encoder.encode(command));
+          log(command, "TX");
         } finally {
           writer.releaseLock();
         }
+      }
+
+      async function send() {
+        await sendCommand(CDS_COMMAND);
+      }
+
+      async function resetMass() {
+        await sendCommand(":M0;");
+        setStatus("Reset de masa enviado", "warn");
       }
 
       async function togglePolling() {
@@ -827,6 +839,15 @@
         } catch (error) {
           log(error?.message || String(error), "ERR");
           setStatus("Error al enviar", "bad");
+        }
+      });
+
+      el.resetMassBtn.addEventListener("click", async () => {
+        try {
+          await resetMass();
+        } catch (error) {
+          log(error?.message || String(error), "ERR");
+          setStatus("Error al resetear masa", "bad");
         }
       });
 
